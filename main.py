@@ -6,6 +6,7 @@ import os
 import asyncssh
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from sqlalchemy import true
 from sqlmodel import select
 from models import SFTPServer
 from database import AsyncSessionLocal
@@ -33,7 +34,7 @@ async def test_sftp_connection(server_id: int):
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(SFTPServer).where(
-                SFTPServer.id == server_id, SFTPServer.is_active is True
+                SFTPServer.id == server_id, SFTPServer.is_active == true()
             )
         )
         server = result.scalar_one_or_none()
