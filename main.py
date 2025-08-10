@@ -4,7 +4,7 @@ FastAPI приложение для скачивания файлов (для Sm
 
 import uvicorn
 from fastapi import FastAPI
-from tasks import discover_files_task
+from tasks import scan_active_servers
 
 app = FastAPI(title="File Downloader")
 
@@ -12,9 +12,10 @@ app = FastAPI(title="File Downloader")
 @app.post("/files/scan")
 async def scan_files():
     """
-    Запускает задачу сканирования файлов на активных SFTP серверах.
+    Запускает асинхронную задачу для сканирования всех активных SFTP серверов
+    и обнаружения новых файлов для загрузки.
     """
-    discover_files_task.delay()
+    scan_active_servers.delay()
     return {"status": "scan_started"}
 
 
