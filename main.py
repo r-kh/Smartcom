@@ -1,63 +1,21 @@
 """
-FastAPI приложение для скачивания файлов для Smartcom.city.
+FastAPI приложение для скачивания файлов (для Smartcom.city)
 """
 
-import os
-import asyncssh
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from sqlalchemy import true
-from sqlmodel import select
-from models import SFTPServer
-from database import AsyncSessionLocal
+from fastapi import FastAPI
+from tasks import discover_files_task
 
 app = FastAPI(title="File Downloader")
 
 
-def decrypt_password(_: str) -> str:
+@app.post("/files/scan")
+async def scan_files():
     """
-    По проекту пароль должен извлекаться из базы данных и расшифровываться,
-    Но по задаче нужна реализация только функционала скачивания файлов.
-    Поэтому эта функция не реализована и пароль берется напрямую из переменной окружения.
+    Запускает задачу сканирования файлов на активных SFTP серверах.
     """
-    password = os.getenv("SFTP_PASSWORD")
-    if not password:
-        raise RuntimeError("Environment variable SFTP_PASSWORD is not set")
-    return password
-
-
-@app.get("/test-sftp-connection/{server_id}")
-async def test_sftp_connection(server_id: int):
-    """
-    Проверяет подключение к SFTP серверу по ID.
-    """
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(SFTPServer).where(
-                SFTPServer.id == server_id, SFTPServer.is_active == true()
-            )
-        )
-        server = result.scalar_one_or_none()
-        if not server:
-            raise HTTPException(
-                status_code=404, detail="SFTP server not found or inactive"
-            )
-
-    password = decrypt_password(server.password_encrypted)
-
-    try:
-        async with asyncssh.connect(
-            server.host,
-            port=server.port,
-            username=server.username,
-            password=password,
-            known_hosts=None,
-        ) as conn:
-            async with conn.start_sftp_client() as sftp:
-                files = await sftp.listdir(".")
-        return {"status": "success", "files": files}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to connect: {e}") from e
+    discover_files_task.delay()
+    return {"status": "scan_started"}
 
 
 # можно запускать main.py напрямую, необязательно через uvicorn (python main.py)
