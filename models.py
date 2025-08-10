@@ -4,7 +4,7 @@
 
 from enum import Enum
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import SQLModel, Field
 
 
@@ -40,12 +40,12 @@ class File(SQLModel, table=True):
     __tablename__ = "files"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    server_uuid: str  # или UUID тип, если используешь uuid.UUID
+    server_uuid: str
     remote_path: str
     filename: str
     size_bytes: Optional[int]
     status: FileStatus = Field(default=FileStatus.DISCOVERED)
     error_message: Optional[str] = None
     minio_object_key: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
