@@ -1,8 +1,10 @@
 """
-Модуль содержит модели для работы с SFTP-серверами.
+Модуль содержит модели для работы с SFTP-серверами и файлами.
 """
 
+from enum import Enum
 from typing import Optional
+from datetime import datetime
 from sqlmodel import SQLModel, Field
 
 
@@ -19,3 +21,31 @@ class SFTPServer(SQLModel, table=True):
     username: str
     password_encrypted: str
     is_active: bool = True
+
+
+class FileStatus(str, Enum):
+    """Статусы файла в процессе обработки."""
+
+    DISCOVERED = "discovered"
+    DOWNLOADED = "downloaded"
+    MINIO_UPLOADED = "minio_uploaded"
+    AMQP_NOTIFY_SENT = "amqp_notify_sent"
+    COMPLETED = "completed"
+    ERROR = "error"
+
+
+class File(SQLModel, table=True):
+    """Модель для таблицы files."""
+
+    __tablename__ = "files"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    server_uuid: str  # или UUID тип, если используешь uuid.UUID
+    remote_path: str
+    filename: str
+    size_bytes: Optional[int]
+    status: FileStatus = Field(default=FileStatus.DISCOVERED)
+    error_message: Optional[str] = None
+    minio_object_key: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
