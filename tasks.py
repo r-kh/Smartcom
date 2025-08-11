@@ -38,8 +38,8 @@ def decrypt_password(_: object) -> str:
 def scan_active_servers():
     """
     Задача Celery, которая сканирует активные SFTP-серверы.
-    Получает список активных серверов из базы и запускает задачу
-    discover_files_task для каждого из них.
+    Получает список активных серверов из базы,
+    и запускает задачу discover_files_task для каждого из них.
     """
     with SessionLocal() as session:
         servers = session.query(SFTPServer).filter(SFTPServer.is_active == true()).all()
@@ -50,8 +50,10 @@ def scan_active_servers():
 @celery.task(bind=True)
 def discover_files_task(_self, server_id: int):
     """
-    Задача Celery, которая обрабатывает файлы для конкретного сервера по его ID.
-    (Сейчас просто выводит сообщение с идентификатором сервера.)
+    Задача Celery для сканирования новых файлов на активном SFTP-сервере.
+    Подключается к серверу, получает список файлов в корневой директории,
+    сверяет их наличие в базе данных, при отсутствии добавляет со статусом DISCOVERED
+    и инициирует задачи download_file_task для их загрузки.
     """
     with SessionLocal() as session:
         server = (
@@ -78,6 +80,8 @@ def discover_files_task(_self, server_id: int):
                 files = await sftp.listdir(".")
                 result = []
                 for f in files:
+                    if f in (".", ".."):  # игнорируем служебные директории
+                        continue
                     try:
                         file_info = await sftp.stat(f)
                         size = file_info.size
@@ -121,7 +125,47 @@ def discover_files_task(_self, server_id: int):
 @celery.task(bind=True)
 def download_file_task(_self, file_id: int):
     """
-    Задача Celery, скачивание файла по ID.
-    (Сейчас просто выводит сообщение с идентификатором файла)
+    Задача Celery для скачивания файла по его ID с SFTP-сервера.
+    Файл сохраняется в папку tmp проекта, статус обновляется в базе данных.
     """
-    print(f"download_file_task called for file_id={file_id}")
+
+    with SessionLocal() as session:
+        file = session.query(File).get(file_id)
+        if not file:
+            return
+        server = (
+            session.query(SFTPServer).filter_by(server_uuid=file.server_uuid).first()
+        )
+        if not server:
+            return
+
+    password = decrypt_password(server.password_encrypted)
+    local_path = os.path.join(os.path.dirname(__file__), "tmp", file.filename)
+
+    async def _download():
+        async with asyncssh.connect(
+            server.host,
+            port=server.port,
+            username=server.username,
+            password=password,
+            known_hosts=None,
+        ) as conn:
+            async with conn.start_sftp_client() as sftp:
+                await sftp.get(
+                    os.path.join(file.remote_path, file.filename), local_path
+                )
+
+    try:
+        asyncio.run(_download())
+        with SessionLocal() as session:
+            file = session.query(File).get(file_id)
+            if file:
+                file.status = FileStatus.DOWNLOADED
+                session.commit()
+    except (asyncssh.Error, asyncio.TimeoutError, OSError) as e:
+        with SessionLocal() as session:
+            file = session.query(File).get(file_id)
+            if file:
+                file.status = FileStatus.ERROR
+                file.error_message = str(e)
+                session.commit()
