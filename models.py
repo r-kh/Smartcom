@@ -5,6 +5,7 @@
 from enum import Enum
 from typing import Optional
 from datetime import datetime, timezone
+from uuid import UUID
 from sqlmodel import SQLModel, Field
 
 
@@ -16,11 +17,15 @@ class SFTPServer(SQLModel, table=True):
     __tablename__ = "sftp_servers"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    host: str
-    port: int = 22
-    username: str
-    password_encrypted: str
-    is_active: bool = True
+    server_uuid: UUID
+    name: str = Field(max_length=100)
+    host: str = Field(max_length=255)
+    port: int = Field(default=22)
+    username: str = Field(max_length=255)
+    password_encrypted: bytes
+    is_active: bool = Field(default=True)
+    created_at: datetime
+    updated_at: datetime
 
 
 class FileStatus(str, Enum):
@@ -40,12 +45,12 @@ class File(SQLModel, table=True):
     __tablename__ = "files"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    server_uuid: str
+    server_uuid: UUID
     remote_path: str
-    filename: str
+    filename: str = Field(max_length=255)
     size_bytes: Optional[int]
-    file_hash: Optional[str] = None
-    hash_algo: str = Field(default="sha256")
+    file_hash: Optional[str] = Field(default=None, max_length=64)
+    hash_algo: str = Field(default="sha256", max_length=10)
     status: FileStatus = Field(default=FileStatus.DISCOVERED)
     error_message: Optional[str] = None
     minio_object_key: Optional[str] = None
