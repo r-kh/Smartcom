@@ -7,6 +7,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from uuid import UUID
 from sqlmodel import SQLModel, Field
+from sqlalchemy import Column, Enum as PGEnum
 
 
 class SFTPServer(SQLModel, table=True):
@@ -51,7 +52,18 @@ class File(SQLModel, table=True):
     size_bytes: Optional[int]
     file_hash: Optional[str] = Field(default=None, max_length=64)
     hash_algo: str = Field(default="sha256", max_length=10)
-    status: FileStatus = Field(default=FileStatus.DISCOVERED)
+    status: FileStatus = Field(
+        sa_column=Column(
+            PGEnum(
+                FileStatus,
+                name="file_status",
+                native_enum=True,
+                values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            ),
+            nullable=False,
+            default=FileStatus.DISCOVERED,
+        )
+    )
     error_message: Optional[str] = None
     minio_object_key: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
