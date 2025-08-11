@@ -44,6 +44,8 @@ class File(SQLModel, table=True):
     remote_path: str
     filename: str
     size_bytes: Optional[int]
+    file_hash: Optional[str] = None
+    hash_algo: str = Field(default="sha256")
     status: FileStatus = Field(default=FileStatus.DISCOVERED)
     error_message: Optional[str] = None
     minio_object_key: Optional[str] = None
