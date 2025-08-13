@@ -7,6 +7,12 @@
 
 ---
 
+#### Демонстрация работы приложения
+
+https://github.com/user-attachments/assets/c3eb90ff-1418-45f8-aff0-4c8ea61beac2
+
+---
+
 #### Инструменты, использованные при решении задачи
 
 - Python, FastAPI, PostgreSQL, Redis, Celery
